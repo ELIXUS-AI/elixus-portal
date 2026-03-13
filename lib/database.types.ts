@@ -111,6 +111,46 @@ export interface PortalSystemStatus {
   updated_at: string;
 }
 
+export interface PortalMessage {
+  id: string;
+  client_id: string;
+  sender_type: 'client' | 'admin';
+  sender_name: string | null;
+  message: string;
+  read: boolean;
+  attachment_url: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  created_at: string;
+}
+
+export interface PortalMessageInsert {
+  id?: string;
+  client_id: string;
+  sender_type: 'client' | 'admin';
+  sender_name?: string | null;
+  message: string;
+  attachment_url?: string | null;
+  attachment_name?: string | null;
+  attachment_type?: string | null;
+}
+
+export interface PortalAppointment {
+  id: string;
+  google_event_id: string;
+  client_id: string;
+  portal_user_id: string | null;
+  summary: string;
+  description: string | null;
+  location: string | null;
+  start_time: string;
+  end_time: string;
+  all_day: boolean;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // -----------------------------------------------------------------------------
 // Insert Types (for creating new records)
 // -----------------------------------------------------------------------------
@@ -265,6 +305,32 @@ export type Database = {
           {
             foreignKeyName: 'portal_system_status_client_id_fkey';
             columns: ['client_id'];
+            referencedRelation: 'portal_clients';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      portal_messages: {
+        Row: PortalMessage;
+        Insert: PortalMessageInsert;
+        Update: { read?: boolean };
+        Relationships: [
+          {
+            foreignKeyName: 'portal_messages_client_id_fkey';
+            columns: ['client_id'];
+            referencedRelation: 'portal_clients';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      portal_appointments: {
+        Row: PortalAppointment;
+        Insert: never;
+        Update: never;
+        Relationships: [
+          {
+            foreignKeyName: 'portal_appointments_portal_user_id_fkey';
+            columns: ['portal_user_id'];
             referencedRelation: 'portal_clients';
             referencedColumns: ['id'];
           }

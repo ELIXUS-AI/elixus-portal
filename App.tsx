@@ -32,12 +32,20 @@ import {
   Cpu,
   LogOut,
   AlertCircle,
-  Trash2
+  Trash2,
+  X,
+  MapPin,
+  Users as UsersIcon,
+  Send,
+  ChevronDown,
+  ChevronUp,
+  Paperclip,
+  Trash2 as Trash2Icon
 } from 'lucide-react';
-import { signIn, signUp, signOut, getSession, getPortalUserData, logActivity, getActivityHistory, onAuthStateChange, resetPassword, updatePassword, ensurePortalClient } from './lib/auth';
+import { signIn, signUp, signOut, getSession, getPortalUserData, logActivity, getActivityHistory, onAuthStateChange, resetPassword, updatePassword, ensurePortalClient, getMessages, sendMessage, markMessagesRead, subscribeToMessages, deleteMessage } from './lib/auth';
 import type { PortalUserData } from './lib/auth';
 import { supabase } from './lib/supabase';
-import type { PortalA2PSubmissionInsert } from './lib/database.types';
+import type { PortalA2PSubmissionInsert, PortalMessage } from './lib/database.types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 const COUNTRIES = [
@@ -109,7 +117,7 @@ const Timeline: React.FC<{ currentPhase: number; goLiveDate?: string | null }> =
       status: phase < currentPhase ? "complete" : phase === currentPhase ? "in-progress" : "pending",
     };
   });
-  const progressWidth = currentPhase <= 1 ? '12.5%' : `${((currentPhase - 1) / (steps.length - 1)) * 100}%`;
+  const progressWidth = `${((currentPhase - 0.5) / steps.length) * 100}%`;
   const formattedGoLive = goLiveDate ? new Date(goLiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
 
   return (
@@ -426,6 +434,18 @@ const ResetPasswordPage: React.FC<{ onComplete: () => void }> = ({ onComplete })
 const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; userData: PortalUserData | null; onSignOut: () => void }> = ({ isA2pComplete, onStartA2p, userData, onSignOut }) => {
   const [activities, setActivities] = useState<{ id: string; action: string; details: string | null; created_at: string }[]>([]);
   const [clearingActivity, setClearingActivity] = useState(false);
+  const [appointments, setAppointments] = useState<{ id: string; summary: string; start_time: string; end_time: string; all_day: boolean; location: string | null; description: string | null; created_by_name: string | null }[]>([]);
+  const [selectedAppointment, setSelectedAppointment] = useState<typeof appointments[number] | null>(null);
+
+  // Messaging state
+  const [chatMessages, setChatMessages] = useState<PortalMessage[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatFile, setChatFile] = useState<File | null>(null);
+  const chatEndRef = React.useRef<HTMLDivElement>(null);
+  const chatFileRef = React.useRef<HTMLInputElement>(null);
+  const chatUnreadCount = chatMessages.filter(m => m.sender_type === 'admin' && !m.read).length;
 
   const handleClearActivity = async () => {
     if (!userData?.client?.id) return;
@@ -455,6 +475,75 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
       getActivityHistory(userData.client.id, 10).then(setActivities);
     }
   }, [userData?.client?.id]);
+
+  useEffect(() => {
+    if (userData?.client?.id) {
+      const now = new Date().toISOString();
+      supabase
+        .from('portal_appointments')
+        .select('id, summary, start_time, end_time, all_day, location, description, created_by_name')
+        .eq('portal_user_id', userData.client.id)
+        .gte('start_time', now)
+        .order('start_time', { ascending: true })
+        .limit(5)
+        .then(({ data, error }) => {
+          if (error) { console.error('Failed to fetch appointments:', error); return; }
+          if (data) setAppointments(data);
+        });
+    }
+  }, [userData?.client?.id]);
+
+  // Fetch messages + subscribe to Realtime
+  useEffect(() => {
+    if (!userData?.client?.id) return;
+    const clientId = userData.client.id;
+
+    getMessages(clientId).then(setChatMessages);
+
+    const unsubscribe = subscribeToMessages(
+      clientId,
+      (newMsg) => {
+        setChatMessages(prev => {
+          if (prev.some(m => m.id === newMsg.id)) return prev;
+          return [...prev, newMsg];
+        });
+      },
+      (oldMsg) => {
+        setChatMessages(prev => prev.filter(m => m.id !== oldMsg.id));
+      }
+    );
+
+    return unsubscribe;
+  }, [userData?.client?.id]);
+
+  // Auto-scroll chat when messages change
+  useEffect(() => {
+    if (chatOpen) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [chatMessages, chatOpen]);
+
+  const handleSendChat = async () => {
+    if ((!chatInput.trim() && !chatFile) || chatSending || !userData?.client?.id) return;
+    setChatSending(true);
+    const senderName = [userData.client.first_name, userData.client.last_name].filter(Boolean).join(' ') || undefined;
+    const { error } = await sendMessage(userData.client.id, chatInput.trim(), senderName, chatFile || undefined);
+    if (error) {
+      console.error('Failed to send message:', error);
+    } else {
+      setChatInput('');
+      setChatFile(null);
+    }
+    setChatSending(false);
+  };
+
+  const handleOpenChat = () => {
+    setChatOpen(true);
+    if (userData?.client?.id) {
+      markMessagesRead(userData.client.id);
+      setChatMessages(prev => prev.map(m => m.sender_type === 'admin' ? { ...m, read: true } : m));
+    }
+  };
 
   return (
     <HUDFrame>
@@ -635,14 +724,272 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
                 <Calendar size={14} className="text-[#1597aa]" /> Appointments
               </h3>
               <div className="space-y-4">
-                <div className="flex items-center justify-center h-16 text-white/20 text-[11px] font-futuristic">
-                  No upcoming appointments
-                </div>
+                {appointments.length > 0 ? appointments.map((appt) => (
+                  <button
+                    key={appt.id}
+                    onClick={() => setSelectedAppointment(appt)}
+                    className="w-full text-left flex items-start gap-3 border-l-2 border-[#1597aa]/20 pl-3 py-1 hover:border-[#1597aa] transition-colors cursor-pointer group"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] text-white/80 font-medium truncate group-hover:text-white transition-colors">{appt.summary}</p>
+                      <p className="text-[10px] text-white/40 mt-0.5">
+                        {appt.all_day
+                          ? new Date(appt.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' — All day'
+                          : new Date(appt.start_time).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' at ' + new Date(appt.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                        }
+                      </p>
+                      {appt.location && (
+                        <p className="text-[9px] text-white/30 mt-0.5 truncate">{appt.location}</p>
+                      )}
+                    </div>
+                    <ChevronRight size={12} className="text-white/20 group-hover:text-[#1597aa] mt-1 flex-shrink-0 transition-colors" />
+                  </button>
+                )) : (
+                  <div className="flex items-center justify-center h-16 text-white/20 text-[11px] font-futuristic">
+                    No upcoming appointments
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Floating Chat Panel */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        {chatOpen ? (
+          <div className="w-[380px] h-[500px] glass-panel rounded-2xl border border-white/10 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-300 shadow-2xl">
+            {/* Chat header */}
+            <div className="shrink-0 p-4 border-b border-white/5 flex items-center justify-between bg-black/30">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-[#1597aa] animate-pulse" />
+                <h3 className="text-xs font-futuristic text-white uppercase tracking-widest">Messages</h3>
+              </div>
+              <button
+                onClick={() => setChatOpen(false)}
+                className="text-white/30 hover:text-white transition-colors"
+              >
+                <ChevronDown size={16} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+              {chatMessages.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-white/20 text-[11px] font-futuristic">
+                  No messages yet
+                </div>
+              ) : (
+                chatMessages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`group/msg flex items-start gap-1 ${msg.sender_type === 'client' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    {msg.sender_type === 'client' && (
+                      <button
+                        onClick={async () => {
+                          const { error: delErr } = await deleteMessage(msg.id);
+                          if (delErr) return;
+                          setChatMessages(prev => prev.filter(m => m.id !== msg.id));
+                        }}
+                        className="opacity-0 group-hover/msg:opacity-100 transition-opacity mt-2 text-white/20 hover:text-red-400 shrink-0"
+                        title="Delete message"
+                      >
+                        <Trash2Icon size={13} />
+                      </button>
+                    )}
+                    <div
+                      className={`max-w-[80%] rounded-xl px-4 py-2.5 ${
+                        msg.sender_type === 'client'
+                          ? 'bg-[#1597aa]/20 border border-[#1597aa]/30'
+                          : 'bg-white/5 border border-white/10'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-[10px] font-futuristic tracking-wider ${msg.sender_type === 'client' ? 'text-[#1597aa]' : 'text-white/50'}`}>
+                          {msg.sender_name || (msg.sender_type === 'client' ? 'You' : 'Elixus Team')}
+                        </span>
+                        <span className="text-[9px] text-white/20">
+                          {new Date(msg.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {msg.message && <p className="text-sm text-white/90 whitespace-pre-wrap">{msg.message}</p>}
+                      {msg.attachment_url && (
+                        <div className="mt-2">
+                          {msg.attachment_type?.startsWith('image/') ? (
+                            <a href={msg.attachment_url} target="_blank" rel="noopener noreferrer">
+                              <img src={msg.attachment_url} alt={msg.attachment_name || 'attachment'} className="max-w-full max-h-36 rounded border border-white/10" />
+                            </a>
+                          ) : (
+                            <a
+                              href={msg.attachment_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-white/5 border border-white/10 hover:border-[#1597aa]/30 transition-colors text-[11px]"
+                            >
+                              <FileText size={14} className="text-[#1597aa] shrink-0" />
+                              <span className="truncate text-white/80">{msg.attachment_name || 'File'}</span>
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* File preview */}
+            {chatFile && (
+              <div className="shrink-0 px-3 py-2 border-t border-white/5 flex items-center gap-2 bg-white/5">
+                <FileText size={14} className="text-[#1597aa] shrink-0" />
+                <span className="text-[11px] text-white/70 truncate flex-1">{chatFile.name}</span>
+                <span className="text-[9px] text-white/30">{(chatFile.size / 1024).toFixed(0)} KB</span>
+                <button onClick={() => setChatFile(null)} className="text-white/30 hover:text-white transition-colors">
+                  <X size={12} />
+                </button>
+              </div>
+            )}
+
+            {/* Input */}
+            <div className="shrink-0 p-3 border-t border-white/5 bg-black/20">
+              <input
+                ref={chatFileRef}
+                type="file"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) setChatFile(f);
+                  e.target.value = '';
+                }}
+              />
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => chatFileRef.current?.click()}
+                  className="px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg text-white/40 hover:text-[#1597aa] hover:border-[#1597aa]/30 transition-all"
+                >
+                  <Paperclip size={16} />
+                </button>
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendChat();
+                    }
+                  }}
+                  placeholder="Type a message..."
+                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-white/20 outline-none focus:border-[#1597aa]/50 transition-colors"
+                />
+                <button
+                  onClick={handleSendChat}
+                  disabled={(!chatInput.trim() && !chatFile) || chatSending}
+                  className="px-3 py-2 bg-[#1597aa]/20 border border-[#1597aa]/30 rounded-lg text-[#1597aa] hover:bg-[#1597aa]/30 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                >
+                  {chatSending ? (
+                    <div className="w-4 h-4 border border-[#1597aa] border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Send size={16} />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleOpenChat}
+            className="relative group w-14 h-14 rounded-full bg-[#1597aa]/20 border border-[#1597aa]/30 flex items-center justify-center text-[#1597aa] hover:bg-[#1597aa]/30 hover:scale-110 transition-all duration-300 shadow-[0_0_20px_rgba(21,151,170,0.15)]"
+          >
+            <MessageSquare size={22} />
+            {chatUnreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-[#1597aa] text-[10px] font-bold flex items-center justify-center text-white shadow-[0_0_10px_rgba(21,151,170,0.5)]">
+                {chatUnreadCount}
+              </span>
+            )}
+          </button>
+        )}
+      </div>
+
+      {/* Appointment Detail Modal */}
+      {selectedAppointment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setSelectedAppointment(null)}>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div
+            className="relative w-full max-w-md glass-panel rounded-2xl border border-white/10 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between p-6 pb-4 border-b border-white/5">
+              <div className="flex-1 min-w-0 pr-4">
+                <p className="text-[10px] font-futuristic text-[#1597aa] uppercase tracking-widest mb-2">Appointment Details</p>
+                <h2 className="text-lg text-white font-medium leading-snug">{selectedAppointment.summary}</h2>
+              </div>
+              <button
+                onClick={() => setSelectedAppointment(null)}
+                className="text-white/30 hover:text-white transition-colors p-1 -mr-1 -mt-1"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-5">
+              {/* Date & Time */}
+              <div className="flex items-start gap-3">
+                <Calendar size={16} className="text-[#1597aa] mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="text-sm text-white/90">
+                    {new Date(selectedAppointment.start_time).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                  </p>
+                  <p className="text-xs text-white/50 mt-0.5">
+                    {selectedAppointment.all_day
+                      ? 'All day'
+                      : new Date(selectedAppointment.start_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                        + ' — '
+                        + new Date(selectedAppointment.end_time).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* With (created_by_name) */}
+              {selectedAppointment.created_by_name && (
+                <div className="flex items-start gap-3">
+                  <UsersIcon size={16} className="text-[#1597aa] mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-white/90">With {selectedAppointment.created_by_name}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Location */}
+              {selectedAppointment.location && (
+                <div className="flex items-start gap-3">
+                  <MapPin size={16} className="text-[#1597aa] mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-white/90">{selectedAppointment.location}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Description */}
+              {selectedAppointment.description && (
+                <div className="flex items-start gap-3">
+                  <FileText size={16} className="text-[#1597aa] mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-sm text-white/70 whitespace-pre-wrap leading-relaxed">{selectedAppointment.description}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </HUDFrame>
   );
 };
@@ -959,7 +1306,16 @@ const App: React.FC = () => {
         {currentStep === 'FORM' && userId && <OnboardingPage onBack={returnToDashboard} onSubmit={handleFormSubmit} userId={userId} />}
         {currentStep === 'CONFIRMATION' && <ConfirmationPage onReturn={returnToDashboard} />}
       </div>
-      <div className="fixed bottom-6 left-6 opacity-30 pointer-events-none select-none z-0"><div className="flex items-center gap-2"><div className="w-1 h-1 bg-[#1597aa] rounded-full animate-pulse" /><span className="text-[10px] font-futuristic tracking-[0.3em] text-white">ELIXUS CORE V4.2.0</span></div></div>
+      <div className="fixed bottom-5 left-5 pointer-events-none select-none z-0 opacity-25">
+        <div className="flex items-center gap-1.5">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="#1597aa" opacity="0.6" />
+            <path d="M2 17L12 22L22 17" stroke="#1597aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M2 12L12 17L22 12" stroke="#1597aa" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="text-[10px] font-futuristic tracking-[0.2em] text-[#1597aa]">Powered by Elixus Engine</span>
+        </div>
+      </div>
     </div>
   );
 };

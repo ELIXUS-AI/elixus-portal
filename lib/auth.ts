@@ -7,6 +7,7 @@ import type {
   PortalA2PSubmission,
   PortalActivityInsert,
   PortalClientUpdate,
+  PortalMessage,
 } from './database.types';
 import type { User, Session, AuthError } from '@supabase/supabase-js';
 
@@ -323,6 +324,140 @@ export async function getActivityHistory(
   }
 
   return (data as { id: string; action: string; details: string | null; created_at: string }[]) || [];
+}
+
+// -----------------------------------------------------------------------------
+// Messaging Functions
+// -----------------------------------------------------------------------------
+
+/**
+ * Get all messages for a client, ordered oldest to newest.
+ */
+export async function getMessages(clientId: string): Promise<PortalMessage[]> {
+  const { data, error } = await supabase
+    .from('portal_messages')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching messages:', error);
+    return [];
+  }
+
+  return (data as PortalMessage[]) || [];
+}
+
+/**
+ * Send a message from the portal client, optionally with a file attachment.
+ */
+export async function sendMessage(
+  clientId: string,
+  message: string,
+  senderName?: string,
+  file?: File
+): Promise<{ error: Error | null }> {
+  let attachmentUrl: string | null = null;
+  let attachmentName: string | null = null;
+  let attachmentType: string | null = null;
+
+  if (file) {
+    const filePath = `${clientId}/${Date.now()}_${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('portal-attachments')
+      .upload(filePath, file);
+
+    if (uploadError) return { error: new Error('File upload failed: ' + uploadError.message) };
+
+    const { data: urlData } = supabase.storage
+      .from('portal-attachments')
+      .getPublicUrl(filePath);
+
+    attachmentUrl = urlData.publicUrl;
+    attachmentName = file.name;
+    attachmentType = file.type;
+  }
+
+  const { error } = await supabase
+    .from('portal_messages')
+    .insert({
+      client_id: clientId,
+      sender_type: 'client',
+      sender_name: senderName || null,
+      message: message || (file ? file.name : ''),
+      attachment_url: attachmentUrl,
+      attachment_name: attachmentName,
+      attachment_type: attachmentType,
+    } as unknown as Record<string, unknown>);
+
+  return { error };
+}
+
+/**
+ * Mark all admin messages as read for a client.
+ */
+export async function markMessagesRead(clientId: string): Promise<void> {
+  await supabase
+    .from('portal_messages')
+    .update({ read: true } as unknown as Record<string, unknown>)
+    .eq('client_id', clientId)
+    .eq('sender_type', 'admin')
+    .eq('read', false);
+}
+
+/**
+ * Delete a specific message (client can only delete their own).
+ */
+export async function deleteMessage(messageId: string): Promise<{ error: Error | null }> {
+  const { error } = await supabase
+    .from('portal_messages')
+    .delete()
+    .eq('id', messageId);
+
+  return { error };
+}
+
+/**
+ * Subscribe to new messages in real-time for a client.
+ * Returns an unsubscribe function.
+ */
+export function subscribeToMessages(
+  clientId: string,
+  onNewMessage: (message: PortalMessage) => void,
+  onDeleteMessage?: (old: { id: string }) => void
+): () => void {
+  const channel = supabase
+    .channel(`portal_messages:${clientId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'portal_messages',
+        filter: `client_id=eq.${clientId}`,
+      },
+      (payload) => {
+        onNewMessage(payload.new as PortalMessage);
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'portal_messages',
+      },
+      (payload) => {
+        if (onDeleteMessage && payload.old && (payload.old as any).id) {
+          onDeleteMessage(payload.old as { id: string });
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
 
 // -----------------------------------------------------------------------------
