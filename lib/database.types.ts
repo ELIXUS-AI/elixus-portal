@@ -33,6 +33,7 @@ export type SMSRegistrationStatus = 'pending' | 'in_progress' | 'approved' | 're
 export type WorkflowStatus = 'pending' | 'in_progress' | 'active';
 
 export type PhaseStatus = 'pending' | 'in_progress' | 'complete';
+export type A2PPhaseStatus = PhaseStatus | 'failed';
 
 // -----------------------------------------------------------------------------
 // Table Row Types
@@ -110,7 +111,7 @@ export interface PortalSystemStatus {
   estimated_go_live: string | null; // DATE as ISO string
   current_phase: number; // 1-5 (legacy, kept for backward compat)
   phase_1_complete: PhaseStatus; // Account Setup
-  phase_2_complete: PhaseStatus; // A2P Registration
+  phase_2_complete: A2PPhaseStatus; // A2P Registration
   phase_3_complete: PhaseStatus; // System Integration
   phase_4_complete: PhaseStatus; // Testing & QA
   phase_5_complete: PhaseStatus; // Go Live
@@ -216,7 +217,7 @@ export interface PortalSystemStatusInsert {
   estimated_go_live?: string | null;
   current_phase?: number;
   phase_1_complete?: PhaseStatus;
-  phase_2_complete?: PhaseStatus;
+  phase_2_complete?: A2PPhaseStatus;
   phase_3_complete?: PhaseStatus;
   phase_4_complete?: PhaseStatus;
   phase_5_complete?: PhaseStatus;
@@ -268,7 +269,7 @@ export interface PortalSystemStatusUpdate {
   estimated_go_live?: string | null;
   current_phase?: number;
   phase_1_complete?: PhaseStatus;
-  phase_2_complete?: PhaseStatus;
+  phase_2_complete?: A2PPhaseStatus;
   phase_3_complete?: PhaseStatus;
   phase_4_complete?: PhaseStatus;
   phase_5_complete?: PhaseStatus;

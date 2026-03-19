@@ -43,7 +43,8 @@ import {
   Trash2 as Trash2Icon,
   Rocket,
   Settings,
-  Zap
+  Zap,
+  XCircle
 } from 'lucide-react';
 import { signIn, signUp, signOut, getSession, getPortalUserData, logActivity, getActivityHistory, onAuthStateChange, resetPassword, updatePassword, ensurePortalClient, getMessages, sendMessage, markMessagesRead, subscribeToMessages, deleteMessage } from './lib/auth';
 import type { PortalUserData } from './lib/auth';
@@ -158,15 +159,22 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
               {step.status === 'in_progress' && (
                 <div className="absolute inset-[-4px] rounded-full bg-amber-500/20 animate-[pulse_2s_ease-in-out_infinite]" />
               )}
+              {step.status === 'failed' && (
+                <div className="absolute inset-[-4px] rounded-full bg-red-500/20 animate-[pulse_2s_ease-in-out_infinite]" />
+              )}
               <div className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all duration-700 ${
                 step.status === 'complete'
                   ? 'bg-gradient-to-br from-[#1597aa] to-[#0d8a9a] border-[#1597aa] text-white shadow-[0_0_20px_rgba(21,151,170,0.5)]'
                   : step.status === 'in_progress'
                   ? 'bg-gradient-to-br from-amber-500 to-amber-600 border-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.4)]'
+                  : step.status === 'failed'
+                  ? 'bg-gradient-to-br from-red-500 to-red-600 border-red-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]'
                   : 'bg-[#0d1117] border-white/10 text-white/25'
               }`}>
                 {step.status === 'complete' ? (
                   <Check size={22} strokeWidth={3} />
+                ) : step.status === 'failed' ? (
+                  <XCircle size={22} strokeWidth={2.5} />
                 ) : (
                   React.createElement(PHASE_ICONS[idx], { size: 18 })
                 )}
@@ -177,6 +185,7 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
             <span className={`text-[8px] sm:text-[9px] font-futuristic uppercase text-center leading-[1.4] tracking-[0.05em] max-w-[70px] sm:max-w-[100px] break-words transition-colors duration-500 ${
               step.status === 'complete' ? 'text-white' :
               step.status === 'in_progress' ? 'text-amber-400' :
+              step.status === 'failed' ? 'text-red-400' :
               'text-white/20'
             }`}>
               {step.label}
@@ -188,9 +197,11 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
                 ? 'bg-[#1597aa]/15 text-[#1597aa] border border-[#1597aa]/30'
                 : step.status === 'in_progress'
                 ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                : step.status === 'failed'
+                ? 'bg-red-500/15 text-red-400 border border-red-500/30'
                 : 'bg-white/[0.03] text-white/15 border border-white/5'
             }`}>
-              {step.status === 'complete' ? 'Complete' : step.status === 'in_progress' ? 'In Progress' : 'Pending'}
+              {step.status === 'complete' ? 'Complete' : step.status === 'in_progress' ? 'In Progress' : step.status === 'failed' ? 'Failed' : 'Pending'}
             </span>
           </div>
         ))}
