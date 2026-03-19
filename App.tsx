@@ -734,22 +734,8 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
                       default: return { label: 'Pending', color: 'bg-white/20' };
                     }
                   };
-                  const a2pStatus = userData?.a2pSubmission?.status;
-                  const a2pDisplay = (() => {
-                    if (!a2pStatus) return { label: 'Pending', color: 'bg-white/20' };
-                    switch (a2pStatus) {
-                      case 'approved': return { label: 'Verified', color: 'bg-green-500' };
-                      case 'rejected': return { label: 'Rejected', color: 'bg-red-500' };
-                      case 'submitted': return { label: 'Submitted', color: 'bg-amber-500 animate-pulse' };
-                      case 'under_review': return { label: 'Under Review', color: 'bg-amber-500 animate-pulse' };
-                      case 'processing': return { label: 'Processing', color: 'bg-amber-500 animate-pulse' };
-                      case 'action_required': return { label: 'Action Required', color: 'bg-amber-500' };
-                      default: return { label: 'Pending', color: 'bg-white/20' };
-                    }
-                  })();
                   return [
                     { name: "CRM Integration", ...statusDisplay(ss?.crm_integration) },
-                    { name: "A2P Verification", ...a2pDisplay },
                     { name: "Workflow Core", ...statusDisplay(ss?.workflow_automation) },
                     { name: "Calendar Sync", ...statusDisplay(ss?.calendar_sync) },
                   ];
