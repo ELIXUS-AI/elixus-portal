@@ -112,24 +112,24 @@ const StatsCard: React.FC<{ icon: React.ReactNode, value: string, label: string,
 );
 
 interface PhaseCompletionStatus {
-  phase_1_complete: boolean;
-  phase_2_complete: boolean;
-  phase_3_complete: boolean;
-  phase_4_complete: boolean;
-  phase_5_complete: boolean;
+  phase_1_complete: string;
+  phase_2_complete: string;
+  phase_3_complete: string;
+  phase_4_complete: string;
+  phase_5_complete: string;
 }
 
 const PHASE_ICONS = [Settings, ShieldCheck, Zap, Terminal, Rocket] as const;
 
 const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | null }> = ({ phases, goLiveDate }) => {
   const steps = [
-    { label: "Account Setup", complete: phases.phase_1_complete },
-    { label: "A2P Registration", complete: phases.phase_2_complete },
-    { label: "System Integration", complete: phases.phase_3_complete },
-    { label: "Testing & QA", complete: phases.phase_4_complete },
-    { label: "Go Live", complete: phases.phase_5_complete },
+    { label: "Account Setup", status: phases.phase_1_complete },
+    { label: "A2P Registration", status: phases.phase_2_complete },
+    { label: "System Integration", status: phases.phase_3_complete },
+    { label: "Testing & QA", status: phases.phase_4_complete },
+    { label: "Go Live", status: phases.phase_5_complete },
   ];
-  const completedCount = steps.filter(s => s.complete).length;
+  const completedCount = steps.filter(s => s.status === 'complete').length;
   const formattedGoLive = goLiveDate ? new Date(goLiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
 
   return (
@@ -152,15 +152,20 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
           <div key={idx} className="flex flex-col items-center gap-4 w-1/5 min-w-0">
             {/* Circle */}
             <div className="relative flex-shrink-0">
-              {step.complete && (
+              {step.status === 'complete' && (
                 <div className="absolute inset-[-4px] rounded-full bg-[#1597aa]/20 animate-[pulse_3s_ease-in-out_infinite]" />
               )}
+              {step.status === 'in_progress' && (
+                <div className="absolute inset-[-4px] rounded-full bg-amber-500/20 animate-[pulse_2s_ease-in-out_infinite]" />
+              )}
               <div className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all duration-700 ${
-                step.complete
+                step.status === 'complete'
                   ? 'bg-gradient-to-br from-[#1597aa] to-[#0d8a9a] border-[#1597aa] text-white shadow-[0_0_20px_rgba(21,151,170,0.5)]'
+                  : step.status === 'in_progress'
+                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 border-amber-500 text-white shadow-[0_0_20px_rgba(245,158,11,0.4)]'
                   : 'bg-[#0d1117] border-white/10 text-white/25'
               }`}>
-                {step.complete ? (
+                {step.status === 'complete' ? (
                   <Check size={22} strokeWidth={3} />
                 ) : (
                   React.createElement(PHASE_ICONS[idx], { size: 18 })
@@ -170,18 +175,22 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
 
             {/* Label */}
             <span className={`text-[8px] sm:text-[9px] font-futuristic uppercase text-center leading-[1.4] tracking-[0.05em] max-w-[70px] sm:max-w-[100px] break-words transition-colors duration-500 ${
-              step.complete ? 'text-white' : 'text-white/20'
+              step.status === 'complete' ? 'text-white' :
+              step.status === 'in_progress' ? 'text-amber-400' :
+              'text-white/20'
             }`}>
               {step.label}
             </span>
 
             {/* Status tag */}
             <span className={`text-[7px] sm:text-[8px] font-futuristic uppercase tracking-[0.15em] px-2 py-0.5 rounded-full transition-all duration-500 ${
-              step.complete
+              step.status === 'complete'
                 ? 'bg-[#1597aa]/15 text-[#1597aa] border border-[#1597aa]/30'
+                : step.status === 'in_progress'
+                ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                 : 'bg-white/[0.03] text-white/15 border border-white/5'
             }`}>
-              {step.complete ? 'Complete' : 'Pending'}
+              {step.status === 'complete' ? 'Complete' : step.status === 'in_progress' ? 'In Progress' : 'Pending'}
             </span>
           </div>
         ))}
@@ -487,13 +496,13 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
   };
 
   const phaseStatus: PhaseCompletionStatus = {
-    phase_1_complete: userData?.systemStatus?.phase_1_complete ?? false,
-    phase_2_complete: userData?.systemStatus?.phase_2_complete ?? false,
-    phase_3_complete: userData?.systemStatus?.phase_3_complete ?? false,
-    phase_4_complete: userData?.systemStatus?.phase_4_complete ?? false,
-    phase_5_complete: userData?.systemStatus?.phase_5_complete ?? false,
+    phase_1_complete: userData?.systemStatus?.phase_1_complete ?? 'pending',
+    phase_2_complete: userData?.systemStatus?.phase_2_complete ?? 'pending',
+    phase_3_complete: userData?.systemStatus?.phase_3_complete ?? 'pending',
+    phase_4_complete: userData?.systemStatus?.phase_4_complete ?? 'pending',
+    phase_5_complete: userData?.systemStatus?.phase_5_complete ?? 'pending',
   };
-  const completedPhaseCount = Object.values(phaseStatus).filter(Boolean).length;
+  const completedPhaseCount = Object.values(phaseStatus).filter(v => v === 'complete').length;
   const progressPercentage = Math.round((completedPhaseCount / 5) * 100);
   const goLiveDate = userData?.systemStatus?.estimated_go_live;
 

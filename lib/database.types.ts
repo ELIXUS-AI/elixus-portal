@@ -32,6 +32,8 @@ export type SMSRegistrationStatus = 'pending' | 'in_progress' | 'approved' | 're
 
 export type WorkflowStatus = 'pending' | 'in_progress' | 'active';
 
+export type PhaseStatus = 'pending' | 'in_progress' | 'complete';
+
 // -----------------------------------------------------------------------------
 // Table Row Types
 // -----------------------------------------------------------------------------
@@ -107,11 +109,11 @@ export interface PortalSystemStatus {
   calendar_sync: IntegrationStatus;
   estimated_go_live: string | null; // DATE as ISO string
   current_phase: number; // 1-5 (legacy, kept for backward compat)
-  phase_1_complete: boolean; // Account Setup
-  phase_2_complete: boolean; // A2P Registration
-  phase_3_complete: boolean; // System Integration
-  phase_4_complete: boolean; // Testing & QA
-  phase_5_complete: boolean; // Go Live
+  phase_1_complete: PhaseStatus; // Account Setup
+  phase_2_complete: PhaseStatus; // A2P Registration
+  phase_3_complete: PhaseStatus; // System Integration
+  phase_4_complete: PhaseStatus; // Testing & QA
+  phase_5_complete: PhaseStatus; // Go Live
   created_at: string;
   updated_at: string;
 }
@@ -213,11 +215,11 @@ export interface PortalSystemStatusInsert {
   calendar_sync?: IntegrationStatus;
   estimated_go_live?: string | null;
   current_phase?: number;
-  phase_1_complete?: boolean;
-  phase_2_complete?: boolean;
-  phase_3_complete?: boolean;
-  phase_4_complete?: boolean;
-  phase_5_complete?: boolean;
+  phase_1_complete?: PhaseStatus;
+  phase_2_complete?: PhaseStatus;
+  phase_3_complete?: PhaseStatus;
+  phase_4_complete?: PhaseStatus;
+  phase_5_complete?: PhaseStatus;
 }
 
 // -----------------------------------------------------------------------------
@@ -265,11 +267,11 @@ export interface PortalSystemStatusUpdate {
   calendar_sync?: IntegrationStatus;
   estimated_go_live?: string | null;
   current_phase?: number;
-  phase_1_complete?: boolean;
-  phase_2_complete?: boolean;
-  phase_3_complete?: boolean;
-  phase_4_complete?: boolean;
-  phase_5_complete?: boolean;
+  phase_1_complete?: PhaseStatus;
+  phase_2_complete?: PhaseStatus;
+  phase_3_complete?: PhaseStatus;
+  phase_4_complete?: PhaseStatus;
+  phase_5_complete?: PhaseStatus;
 }
 
 // -----------------------------------------------------------------------------
