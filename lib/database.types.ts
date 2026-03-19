@@ -106,7 +106,12 @@ export interface PortalSystemStatus {
   workflow_automation: WorkflowStatus;
   calendar_sync: IntegrationStatus;
   estimated_go_live: string | null; // DATE as ISO string
-  current_phase: number; // 1-5
+  current_phase: number; // 1-5 (legacy, kept for backward compat)
+  phase_1_complete: boolean; // Account Setup
+  phase_2_complete: boolean; // A2P Registration
+  phase_3_complete: boolean; // System Integration
+  phase_4_complete: boolean; // Testing & QA
+  phase_5_complete: boolean; // Go Live
   created_at: string;
   updated_at: string;
 }
@@ -208,6 +213,11 @@ export interface PortalSystemStatusInsert {
   calendar_sync?: IntegrationStatus;
   estimated_go_live?: string | null;
   current_phase?: number;
+  phase_1_complete?: boolean;
+  phase_2_complete?: boolean;
+  phase_3_complete?: boolean;
+  phase_4_complete?: boolean;
+  phase_5_complete?: boolean;
 }
 
 // -----------------------------------------------------------------------------
@@ -255,6 +265,11 @@ export interface PortalSystemStatusUpdate {
   calendar_sync?: IntegrationStatus;
   estimated_go_live?: string | null;
   current_phase?: number;
+  phase_1_complete?: boolean;
+  phase_2_complete?: boolean;
+  phase_3_complete?: boolean;
+  phase_4_complete?: boolean;
+  phase_5_complete?: boolean;
 }
 
 // -----------------------------------------------------------------------------

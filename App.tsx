@@ -108,16 +108,23 @@ const StatsCard: React.FC<{ icon: React.ReactNode, value: string, label: string,
   </div>
 );
 
-const Timeline: React.FC<{ currentPhase: number; goLiveDate?: string | null }> = ({ currentPhase, goLiveDate }) => {
-  const stepLabels = ["Account Setup", "A2P Registration", "System Integration", "Testing & QA", "Go Live"];
-  const steps = stepLabels.map((label, idx) => {
-    const phase = idx + 1;
-    return {
-      label,
-      status: phase < currentPhase ? "complete" : phase === currentPhase ? "in-progress" : "pending",
-    };
-  });
-  const progressWidth = `${((currentPhase - 0.5) / steps.length) * 100}%`;
+interface PhaseCompletionStatus {
+  phase_1_complete: boolean;
+  phase_2_complete: boolean;
+  phase_3_complete: boolean;
+  phase_4_complete: boolean;
+  phase_5_complete: boolean;
+}
+
+const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | null }> = ({ phases, goLiveDate }) => {
+  const steps = [
+    { label: "Account Setup", complete: phases.phase_1_complete },
+    { label: "A2P Registration", complete: phases.phase_2_complete },
+    { label: "System Integration", complete: phases.phase_3_complete },
+    { label: "Testing & QA", complete: phases.phase_4_complete },
+    { label: "Go Live", complete: phases.phase_5_complete },
+  ];
+  const completedCount = steps.filter(s => s.complete).length;
   const formattedGoLive = goLiveDate ? new Date(goLiveDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'TBD';
 
   return (
@@ -127,40 +134,50 @@ const Timeline: React.FC<{ currentPhase: number; goLiveDate?: string | null }> =
           <Globe size={16} className="text-[#1597aa]" />
           Implementation Journey
         </h3>
-        <span className="text-[10px] font-futuristic text-white/40 uppercase tracking-widest hidden sm:inline">Est. Go-Live: {formattedGoLive}</span>
+        <div className="flex items-center gap-4">
+          <span className="text-[10px] font-futuristic text-[#1597aa]/80 uppercase tracking-widest hidden sm:inline">
+            {completedCount} / {steps.length} Complete
+          </span>
+          <span className="text-[10px] font-futuristic text-white/40 uppercase tracking-widest hidden sm:inline">Est. Go-Live: {formattedGoLive}</span>
+        </div>
       </div>
 
-      <div className="relative flex justify-between items-center w-full px-2">
-        {/* Connecting Lines */}
-        <div className="absolute top-[20px] left-0 w-full h-[2px] bg-white/5 z-0" />
-        <div
-          className="absolute top-[20px] left-0 h-[2px] bg-[#1597aa] z-0 transition-all duration-1000"
-          style={{ width: progressWidth }}
-        />
-        
+      <div className="flex justify-between items-start w-full px-2 gap-2">
         {steps.map((step, idx) => (
-          <div key={idx} className="relative z-10 flex flex-col items-center gap-6 w-1/5 min-w-0">
+          <div key={idx} className="flex flex-col items-center gap-4 w-1/5 min-w-0">
+            {/* Circle */}
             <div className="relative flex-shrink-0">
-              {step.status === 'in-progress' && (
-                <div className="absolute inset-[-3px] rounded-full border-2 border-[#1597aa]/60 animate-pulse" />
+              {step.complete && (
+                <div className="absolute inset-[-4px] rounded-full bg-[#1597aa]/20 animate-[pulse_3s_ease-in-out_infinite]" />
               )}
-              <div className={`relative w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${
-                step.status === 'complete' ? 'bg-[#1597aa] border-[#1597aa] text-white shadow-[0_0_15px_#1597aa]' :
-                step.status === 'in-progress' ? 'bg-[#0a0f1a] border-[#1597aa] text-[#1597aa] shadow-[0_0_20px_rgba(21,151,170,0.4)]' :
-                'bg-[#0d1117] border-white/10 text-white/20'
+              <div className={`relative w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center border-2 transition-all duration-700 ${
+                step.complete
+                  ? 'bg-gradient-to-br from-[#1597aa] to-[#0d8a9a] border-[#1597aa] text-white shadow-[0_0_20px_rgba(21,151,170,0.5)]'
+                  : 'bg-[#0d1117] border-white/10 text-white/25'
               }`}>
-                {step.status === 'complete' ? <Check size={18} /> : <span className="text-[10px] font-futuristic">{idx + 1}</span>}
+                {step.complete ? (
+                  <Check size={22} strokeWidth={3} />
+                ) : (
+                  <span className="text-[11px] font-futuristic">{idx + 1}</span>
+                )}
               </div>
             </div>
-            <div className="h-10 flex items-start justify-center">
-              <span className={`text-[8px] sm:text-[9px] font-futuristic uppercase text-center leading-[1.4] tracking-[0.05em] max-w-[70px] sm:max-w-[100px] break-words ${
-                step.status === 'complete' ? 'text-white' : 
-                step.status === 'in-progress' ? 'text-[#1597aa]' : 
-                'text-white/20'
-              }`}>
-                {step.label}
-              </span>
-            </div>
+
+            {/* Label */}
+            <span className={`text-[8px] sm:text-[9px] font-futuristic uppercase text-center leading-[1.4] tracking-[0.05em] max-w-[70px] sm:max-w-[100px] break-words transition-colors duration-500 ${
+              step.complete ? 'text-white' : 'text-white/20'
+            }`}>
+              {step.label}
+            </span>
+
+            {/* Status tag */}
+            <span className={`text-[7px] sm:text-[8px] font-futuristic uppercase tracking-[0.15em] px-2 py-0.5 rounded-full transition-all duration-500 ${
+              step.complete
+                ? 'bg-[#1597aa]/15 text-[#1597aa] border border-[#1597aa]/30'
+                : 'bg-white/[0.03] text-white/15 border border-white/5'
+            }`}>
+              {step.complete ? 'Complete' : 'Pending'}
+            </span>
           </div>
         ))}
       </div>
@@ -464,10 +481,15 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
     }
   };
 
-  const effectivePhase = userData?.systemStatus?.current_phase ?? 1;
-
-  const currentPhase = effectivePhase;
-  const progressPercentage = Math.round((currentPhase / 5) * 100);
+  const phaseStatus: PhaseCompletionStatus = {
+    phase_1_complete: userData?.systemStatus?.phase_1_complete ?? false,
+    phase_2_complete: userData?.systemStatus?.phase_2_complete ?? false,
+    phase_3_complete: userData?.systemStatus?.phase_3_complete ?? false,
+    phase_4_complete: userData?.systemStatus?.phase_4_complete ?? false,
+    phase_5_complete: userData?.systemStatus?.phase_5_complete ?? false,
+  };
+  const completedPhaseCount = Object.values(phaseStatus).filter(Boolean).length;
+  const progressPercentage = Math.round((completedPhaseCount / 5) * 100);
   const goLiveDate = userData?.systemStatus?.estimated_go_live;
 
   useEffect(() => {
@@ -598,7 +620,7 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
           </div>
         </div>
 
-        <Timeline currentPhase={currentPhase} goLiveDate={goLiveDate} />
+        <Timeline phases={phaseStatus} goLiveDate={goLiveDate} />
 
         {/* Action Required / Completed Modules */}
         <div className="mb-10">

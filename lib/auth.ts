@@ -93,8 +93,12 @@ export async function signUp(data: SignUpData): Promise<AuthResult> {
       // by deleting the auth user or logging for manual cleanup.
     }
 
-    // Create their initial system status record (phase 2 = Account Setup complete)
-    const statusData: PortalSystemStatusInsert = { client_id: authData.user.id, current_phase: 2 };
+    // Create their initial system status record (Account Setup complete on signup)
+    const statusData: PortalSystemStatusInsert = {
+      client_id: authData.user.id,
+      current_phase: 2,
+      phase_1_complete: true,
+    };
     const { error: statusError } = await supabase
       .from('portal_system_status')
       .insert(statusData as unknown as Record<string, unknown>);
