@@ -40,7 +40,10 @@ import {
   ChevronDown,
   ChevronUp,
   Paperclip,
-  Trash2 as Trash2Icon
+  Trash2 as Trash2Icon,
+  Rocket,
+  Settings,
+  Zap
 } from 'lucide-react';
 import { signIn, signUp, signOut, getSession, getPortalUserData, logActivity, getActivityHistory, onAuthStateChange, resetPassword, updatePassword, ensurePortalClient, getMessages, sendMessage, markMessagesRead, subscribeToMessages, deleteMessage } from './lib/auth';
 import type { PortalUserData } from './lib/auth';
@@ -116,6 +119,8 @@ interface PhaseCompletionStatus {
   phase_5_complete: boolean;
 }
 
+const PHASE_ICONS = [Settings, ShieldCheck, Zap, Terminal, Rocket] as const;
+
 const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | null }> = ({ phases, goLiveDate }) => {
   const steps = [
     { label: "Account Setup", complete: phases.phase_1_complete },
@@ -158,7 +163,7 @@ const Timeline: React.FC<{ phases: PhaseCompletionStatus; goLiveDate?: string | 
                 {step.complete ? (
                   <Check size={22} strokeWidth={3} />
                 ) : (
-                  <span className="text-[11px] font-futuristic">{idx + 1}</span>
+                  React.createElement(PHASE_ICONS[idx], { size: 18 })
                 )}
               </div>
             </div>
