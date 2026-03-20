@@ -51,6 +51,7 @@ import type { PortalUserData } from './lib/auth';
 import { supabase } from './lib/supabase';
 import type { PortalA2PSubmissionInsert, PortalMessage } from './lib/database.types';
 import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { usePerformance } from './lib/usePerformance';
 
 const COUNTRIES = [
   "United States", "Canada", "United Kingdom", "Australia", "Afghanistan", "Albania", "Algeria", "Andorra", "Angola", 
@@ -489,6 +490,17 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
   const chatFileRef = React.useRef<HTMLInputElement>(null);
   const chatUnreadCount = chatMessages.filter(m => m.sender_type === 'admin' && !m.read).length;
 
+  // GHL Performance data
+  const ghlConnected = !!userData?.client?.ghl_location_id;
+  const { data: perfData, loading: perfLoading, error: perfError, refetch: refetchPerf } = usePerformance(
+    userData?.client?.id ?? null,
+    ghlConnected
+  );
+
+  useEffect(() => {
+    refetchPerf();
+  }, [refetchPerf]);
+
   const handleClearActivity = async () => {
     if (!userData?.client?.id) return;
     if (!confirm('Clear all activity history?')) return;
@@ -635,13 +647,18 @@ const DashboardPage: React.FC<{ isA2pComplete: boolean; onStartA2p: () => void; 
             <h2 className="text-[10px] font-futuristic text-[#1597aa] uppercase tracking-[0.3em] flex items-center gap-2">
               <Terminal size={12} /> Performance Overview
             </h2>
-            <RefreshCw size={12} className="text-white/20 cursor-pointer hover:text-[#1597aa] transition-colors" />
+            <RefreshCw size={12} className={`text-white/20 cursor-pointer hover:text-[#1597aa] transition-colors ${perfLoading ? 'animate-spin' : ''}`} onClick={refetchPerf} />
           </div>
+          {perfError && (
+            <div className="mb-4 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-xs font-mono">
+              Error: {perfError}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsCard icon={<Target size={28} />} value="—" label="Leads Captured" trend="Awaiting integration" />
-            <StatsCard icon={<MessageSquare size={28} />} value="—" label="Active Chats" trend="Awaiting integration" />
-            <StatsCard icon={<Calendar size={28} />} value="—" label="Booked Calls" trend="Awaiting integration" />
-            <StatsCard icon={<TrendingUp size={28} />} value="—" label="Pipeline Value" trend="Awaiting integration" />
+            <StatsCard icon={<Target size={28} />} value={perfData ? String(perfData.leadsCount) : '—'} label="Leads Captured" trend={!ghlConnected ? 'No GHL linked' : perfLoading ? 'Loading...' : perfError ? 'Error' : 'Last 30 days'} />
+            <StatsCard icon={<MessageSquare size={28} />} value={perfData ? String(perfData.activeChatsCount) : '—'} label="Active Chats" trend={!ghlConnected ? 'No GHL linked' : perfLoading ? 'Loading...' : perfError ? 'Error' : 'Active'} />
+            <StatsCard icon={<Calendar size={28} />} value={perfData ? String(perfData.bookedCallsCount) : '—'} label="Booked Calls" trend={!ghlConnected ? 'No GHL linked' : perfLoading ? 'Loading...' : perfError ? 'Error' : 'Last 30 days'} />
+            <StatsCard icon={<TrendingUp size={28} />} value={perfData ? (perfData.pricePerBooking != null ? `$${perfData.totalPipelineValue.toLocaleString()}` : 'Not configured') : '—'} label="Pipeline Value" trend={!ghlConnected ? 'No GHL linked' : perfLoading ? 'Loading...' : perfError ? 'Error' : perfData?.pricePerBooking == null ? 'Set price per booking' : 'Qualified leads'} />
           </div>
         </div>
 
